@@ -20,20 +20,26 @@
 
 package io.github.dsheirer.alias.action.script;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import io.github.dsheirer.alias.Alias;
 import io.github.dsheirer.alias.action.AliasActionType;
 import io.github.dsheirer.alias.action.RecurringAction;
+import io.github.dsheirer.identifier.Identifier;
 import io.github.dsheirer.message.IMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.List;
 
 public class ScriptAction extends RecurringAction
 {
     private final static Logger mLog = LoggerFactory.getLogger(ScriptAction.class);
+
+    private final ObjectMapper mObjMapper = new ObjectMapper();
 
     private String mScript;
 
@@ -65,7 +71,7 @@ public class ScriptAction extends RecurringAction
     {
         try
         {
-            play();
+            play(alias, message);
         }
         catch(Exception e)
         {
@@ -73,11 +79,12 @@ public class ScriptAction extends RecurringAction
         }
     }
 
-    public void play() throws Exception
+    private void play(Alias alias, IMessage message) throws Exception
     {
         if(mScript != null)
         {
-            ProcessBuilder pb = new ProcessBuilder(mScript);
+            String messageAsJson = mObjMapper.writeValueAsString(new ScriptMessageDto(message));
+            ProcessBuilder pb = new ProcessBuilder(mScript, alias.getName(), messageAsJson);
 
             pb.redirectErrorStream(true);
 
@@ -131,5 +138,38 @@ public class ScriptAction extends RecurringAction
         }
 
         return sb.toString();
+    }
+
+    /**
+     * Facade for an {@link IMessage} that lets us annotate and write it as JSON.
+     */
+    private static class ScriptMessageDto {
+
+        private final IMessage mMessage;
+
+        private ScriptMessageDto(IMessage message) {
+            mMessage = message;
+        }
+
+        @JsonProperty
+        public long getTimeStamp() {
+            return mMessage.getTimestamp();
+        }
+
+        @JsonProperty
+        public int getTimeslot() {
+            return mMessage.getTimeslot();
+        }
+
+        @JsonProperty
+        public String getProtocol() {
+            return mMessage.getProtocol().name();
+        }
+
+        @JsonProperty
+        public List<String> getIdentifiers() {
+            return mMessage.getIdentifiers().stream().map(Identifier::toString).toList();
+        }
+
     }
 }
